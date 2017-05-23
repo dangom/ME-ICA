@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-__version__="v2.5 beta6"
+__version__="v3.0 beta1"
 """
 # Multi-Echo ICA, Version %s
 # See http://dx.doi.org/10.1016/j.neuroimage.2011.12.028
@@ -36,9 +36,10 @@ parser.add_option('-s',"",dest='s0',help="Skull-stripped S0 weighted volume, opt
 parser.add_option('-a',"",dest='anat',help="Anatomical volume",default='')
 parser.add_option('-p',"",dest='prefix',help="Alignment matrix prefix" ,default='')
 parser.add_option('',"--cmass",action='store_true',dest='cmass',help="Align cmass before main co-registration" ,default=False)
+parser.add_option('',"--autocmass",action='store_false',dest='autocmass',help="Automatic cmass detection (default yes)" ,default=True)
 parser.add_option('',"--maxrot",dest='maxrot',help="Maximum rotation, default 30" ,default='30')
 parser.add_option('',"--maxshift",dest='maxshf',help="Maximum shift, default 30" ,default='30')
-parser.add_option('',"--maxscl",dest='maxscl',help="Maximum shift, default 30" ,default='1.2')
+parser.add_option('',"--maxscl",dest='maxscl',help="Maximum scale, default 1.01" ,default='1.01')
 (options,args) = parser.parse_args()
 
 """
@@ -127,17 +128,31 @@ def allineate(sourcevol, weight, targetvol, prefix, maxrot, maxshf,maxscl,do_cma
 	outvol_prefix = "%s_al"  % prefix
 	outmat_prefix = "%s_al_mat"  % prefix
 	cmass_opt = ''
-	if do_cmass: cmass_opt = '-cmass'
+	autocmass=False
+	if do_cmass or options.autocmass: cmass_opt = '-cmass'
+	elif not do_cmass and not options.autocmass: cmass_opt=''
 	align_opts = "-lpc -weight %s -maxshf %s -maxrot %s -maxscl %s %s" % (weightvol, maxrot, maxshf,maxscl,cmass_opt)
 	sl.append("3dAllineate -overwrite -weight_frac 1.0 -VERB -warp aff -source_automask+2 -master SOURCE -source %s -base %s -prefix ./%s -1Dmatrix_save ./%s %s " \
 		% (sourcevol,targetvol,outvol_prefix,outmat_prefix,align_opts))
+	if options.autocmass: 
+		cmass_opt=''
+		align_opts = "-lpc -weight %s -maxshf %s -maxrot %s -maxscl %s %s" % (weightvol, maxrot, maxshf,maxscl,cmass_opt)
+	sl.append("3dAllineate -overwrite -weight_frac 1.0 -VERB -warp aff -source_automask+2 -master SOURCE -source %s -base %s -prefix ./ncm_%s -1Dmatrix_save ./ncm_%s %s " \
+		% (sourcevol,targetvol,outvol_prefix,outmat_prefix,align_opts))
 	outvol_name = niibrik(outvol_prefix)
 	outmat_name = outmat_prefix + 'blah'
+
 	return outvol_name, outmat_name
 
-def aligntest(target,source,testname):
-	sl.append("3dresample -overwrite -master %s -inset %s -prefix altestA -rmode NN" % (target,source))
-	sl.append("echo `3ddot altestA+orig %s` > %s.txt" % (target,testname))
+def cmselect(base,allin):
+	if options.autocmass:
+		sl.append("3dresample -overwrite -master %s -prefix rs_%s -inset %s -rmode NN" % (base,allin,allin) )
+		sl.append("3dresample -overwrite -master %s -prefix rs_ncm_%s -inset ncm_%s -rmode NN" % (base,allin,allin) )
+		sl.append("echo `3ddot -dodice %s rs_ncm_%s` > ncm_olap.txt" % (base,allin))
+		sl.append("echo `3ddot -dodice %s rs_%s` > cm_olap.txt" % (base,allin))
+		sl.append("ncm_olap=`cat ncm_olap.txt`; cm_olap=`cat cm_olap.txt`")
+		sl.append("""mv_dec=`echo "$ncm_olap>$cm_olap" | bc`""")
+		sl.append("""if [ "$mv_dec" == "1" ] ; then 3drename -overwrite ncm_%s %s ; mv ncm_%s_mat.aff12.1D %s_mat.aff12.1D; fi """ % (allin,allin,dsprefix(allin),dsprefix(allin)))
 
 def runproc(script_prefix, scrlines):
 	script_name = "_walignp_mepi_anat_%s.sh" % script_prefix
@@ -154,6 +169,9 @@ basevol,weightvol = graywt(t2s_name,s0_name)
 
 """Run 3dAllineate"""
 allin_volume,allin_matrix = allineate(anat_name,weightvol,basevol,options.prefix,options.maxrot,options.maxshf,options.maxscl,options.cmass)
+
+"""For auto center-of-mass, check dice of COM and no-COM options"""
+cmselect(basevol,allin_volume)
 
 """Run procedure"""
 runproc(options.prefix, sl)
