@@ -31,7 +31,7 @@ import scipy.stats as stats
 import time
 import datetime
 if __name__=='__main__':
-	selfuncfile='%s/select_model_fft20d.py' % os.path.dirname(argv[0])
+	selfuncfile='%s/select_model_fft20e.py' % os.path.dirname(argv[0])
 	execfile(selfuncfile)
 import cPickle as pickle
 import gzip
