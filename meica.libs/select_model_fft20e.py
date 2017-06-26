@@ -253,7 +253,7 @@ def fitgaussian(data):
 
 def selcomps(seldict,debug=False,olevel=2,oversion=99,knobargs='',filecsdata=False,savecsdiag=True,group0_only=False,strict_mode=False):
 
-	selmodelversion='fft20c.051517'
+	selmodelversion='fft20e.062517'
 
 	#import ipdb
 	import numpy.fft as fft
@@ -611,7 +611,8 @@ def selcomps(seldict,debug=False,olevel=2,oversion=99,knobargs='',filecsdata=Fal
 	#Want to replace field_art with an acf/SVM based approach instead of a kurtosis/filter one
 	field_art = np.setdiff1d(nc[andb([mmix_kurt_z_max>5,Kappas<minK_ign])==2],group0)
 	field_art = np.union1d(np.setdiff1d(nc[andb([mmix_kurt_z_max>2,rankvec(mmix_kurt_z_max)-rankvec(Kappas)>newcest/2,Vz2>1,Kappas<F01])==4],group0),field_art)
-	field_art = np.union1d(np.setdiff1d(nc[andb([mmix_kurt_z_max>3,Vz2>3,Kappas<F01])==3],group0),field_art)
+	field_art = np.union1d(np.setdiff1d(nc[andb([mmix_kurt_z_max>3,Vz2>3,Rhos>np.percentile(Rhos[group0],75)  ])==3],group0),field_art)
+	field_art = np.union1d(np.setdiff1d(nc[andb([mmix_kurt_z_max>5,Vz2>5  ])==2],group0),field_art)
 	misc_art = np.setdiff1d(nc[andb([(rankvec(Vz)-rankvec(Ktz))>newcest/2,Kappas<Khighelbowval])==2],group0)
 	ign_cand = np.unique(list(field_art)+list(phys_art)+list(misc_art))
 	g0_red = np.setdiff1d(group0,ign_cand)
